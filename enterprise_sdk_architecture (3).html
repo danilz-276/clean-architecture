@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="vi" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Secure SDK Architecture</title>
+    
+    <!-- Tailwind CSS (Bao gồm cấu hình Dark Mode) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Thư viện Kéo, Thả, Phóng to SVG -->
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+
+    <style>
+        body {
+            -webkit-font-smoothing: antialiased;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Cơ chế Tab: Giữ không gian cho SVG tính toán kích thước */
+        .tab-wrapper {
+            position: relative;
+            width: 100%;
+        }
+        .tab-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            visibility: hidden;
+            opacity: 0;
+            z-index: -1;
+            pointer-events: none;
+            transition: opacity 0.4s ease-out;
+        }
+        .tab-panel.active {
+            position: relative;
+            visibility: visible;
+            opacity: 1;
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        /* Nền Grid Chấm Bi (Thích ứng Light/Dark) */
+        .bg-grid-pattern {
+            background-color: #ffffff;
+            background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+            background-position: center top;
+        }
+        
+        .dark .bg-grid-pattern {
+            background-color: #0f172a; /* slate-900 */
+            background-image: radial-gradient(#334155 1.5px, transparent 1.5px);
+        }
+
+        /* Ghi đè con trỏ khi tương tác sơ đồ */
+        .mermaid-view {
+            cursor: grab;
+        }
+        .mermaid-view:active {
+            cursor: grabbing;
+        }
+        
+        /* Ẩn scrollbar cho khu vực Tab trên Mobile */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body class="p-4 md:p-8 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen">
+    
+    <div class="max-w-7xl mx-auto bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors duration-300">
+        
+        <!-- Header Section -->
+        <div class="p-6 md:p-10 border-b border-slate-100 dark:border-slate-800 bg-[#f8fafc] dark:bg-slate-900/50 flex flex-col md:flex-row md:items-start justify-between gap-6 transition-colors duration-300">
+            <div>
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 text-xs font-bold tracking-wide mb-5">
+                    <div class="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400"></div>
+                    TÀI LIỆU KIẾN TRÚC
+                </span>
+                <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-4">
+                    Kiến trúc Enterprise Secure SDK
+                </h1>
+                <p class="text-lg text-slate-600 dark:text-slate-400 max-w-3xl leading-relaxed">
+                    Bản thiết kế tổng thể cho hệ thống phân phối Map SDK, API Cảnh báo và bảo vệ Tài sản Trí tuệ (IP) theo chuẩn B2B doanh nghiệp lớn.
+                </p>
+            </div>
+            
+            <!-- Nút Toggle Dark/Light Mode -->
+            <button id="theme-toggle" class="shrink-0 p-3 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <!-- Icon Sun (Hiện khi dark mode) -->
+                <svg id="theme-icon-sun" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                <!-- Icon Moon (Hiện khi light mode) -->
+                <svg id="theme-icon-moon" class="w-6 h-6 block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+            </button>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="px-6 md:px-10 pt-6 border-b border-slate-200 dark:border-slate-800">
+            <nav class="flex overflow-x-auto hide-scrollbar gap-3 pb-4" role="tablist" id="tab-nav">
+                <button class="tab-btn active shrink-0 px-5 py-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-semibold transition-all flex items-center gap-2" data-target="tab-arch">
+                    <span>🏗️</span> 1. Kiến trúc Đa tầng (Wrapper)
+                </button>
+                <button class="tab-btn shrink-0 px-5 py-3 rounded-lg border border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm font-medium transition-all flex items-center gap-2" data-target="tab-blackbox">
+                    <span>⬛</span> 2. Mô hình Hộp Đen (C++ Core)
+                </button>
+                <button class="tab-btn shrink-0 px-5 py-3 rounded-lg border border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm font-medium transition-all flex items-center gap-2" data-target="tab-key">
+                    <span>🔑</span> 3. Quản lý Khóa & Giải mã
+                </button>
+                <button class="tab-btn shrink-0 px-5 py-3 rounded-lg border border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm font-medium transition-all flex items-center gap-2" data-target="tab-api">
+                    <span>🌐</span> 4. Gọi API: So sánh
+                </button>
+            </nav>
+        </div>
+
+        <div class="p-6 md:p-10 tab-wrapper min-h-[600px]">
+            
+            <!-- TAB 1: KIẾN TRÚC ĐA TẦNG -->
+            <div id="tab-arch" class="tab-panel active">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="flex items-center justify-center w-8 h-8 bg-slate-800 dark:bg-slate-700 text-white rounded-md">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-white">Luồng Giao tiếp: Tầng Flutter -> Tầng Native -> Tầng C++</h3>
+                </div>
+                
+                <!-- Khu vực Diagram với tính năng Kéo/Thả/Zoom -->
+                <div class="diagram-section relative w-full h-[500px] md:h-[650px] bg-grid-pattern border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-inner group" data-index="0">
+                    
+                    <!-- Thanh công cụ Zoom -->
+                    <div class="absolute top-4 right-4 z-10 flex flex-col gap-1 bg-white/90 dark:bg-slate-800/90 p-1.5 rounded-lg backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-sm opacity-100 transition-opacity">
+                        <button class="btn-zoom-in p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300 transition-colors" title="Phóng to">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        </button>
+                        <button class="btn-zoom-out p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300 transition-colors" title="Thu nhỏ">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                        </button>
+                        <button class="btn-zoom-reset p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300 transition-colors" title="Căn giữa & Mặc định">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                        </button>
+                    </div>
+
+                    <!-- Nơi render SVG -->
+                    <div class="mermaid-view absolute inset-0 w-full h-full flex items-center justify-center"></div>
+                    
+                    <!-- Nguồn dữ liệu Mermaid (Ẩn) -->
+                    <pre class="mermaid-source hidden">
+flowchart TD
+    %%THEME_STYLES%%
+    
+    subgraph L1 [Tầng 1: Client App]
+        Dart(Flutter Plugin / App Code):::app -->|invokeMethod| MC(MethodChannel):::app
+    end
+
+    subgraph L2 [Tầng 2: Native Wrapper]
+        direction LR
+        Android(Android Wrapper - Java/Kotlin):::wrapper
+        iOS(iOS Wrapper - Obj-C/Swift):::wrapper
+    end
+
+    subgraph L3 [Tầng 3: The Core Hộp Đen]
+        Core{C++ Core Engine<br>Xử lý Logic & Mã hóa}:::core
+    end
+
+    MC ==>|Call| Android
+    MC ==>|Call| iOS
+    
+    Android <==>|Giao tiếp qua JNI| Core
+    iOS <==>|Giao tiếp qua Obj-C++| Core
+                    </pre>
+                </div>
+            </div>
+
+            <!-- TAB 2: MÔ HÌNH HỘP ĐEN -->
+            <div id="tab-blackbox" class="tab-panel">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="flex items-center justify-center w-8 h-8 bg-slate-800 dark:bg-slate-700 text-white rounded-md">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-white">Mô phỏng Quá trình Dịch ngược (Reverse Engineering)</h3>
+                </div>
+
+                <div class="diagram-section relative w-full h-[500px] md:h-[650px] bg-grid-pattern border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-inner group" data-index="1">
+                    <!-- Thanh công cụ Zoom -->
+                    <div class="absolute top-4 right-4 z-10 flex flex-col gap-1 bg-white/90 dark:bg-slate-800/90 p-1.5 rounded-lg backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <button class="btn-zoom-in p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Phóng to"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></button>
+                        <button class="btn-zoom-out p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Thu nhỏ"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg></button>
+                        <button class="btn-zoom-reset p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Căn giữa & Mặc định"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg></button>
+                    </div>
+                    <div class="mermaid-view absolute inset-0 w-full h-full flex items-center justify-center"></div>
+                    <pre class="mermaid-source hidden">
+flowchart LR
+    %%THEME_STYLES%%
+    
+    Hacker((Hacker)):::hacker
+    
+    subgraph S1 [Tầng Dart]
+        D[Decompile APK/IPA]:::normal
+    end
+    
+    subgraph S2 [Tầng Java/Swift]
+        J[Phân tích Native Wrapper]:::normal
+    end
+    
+    subgraph S3 [Tầng C++]
+        C[Dịch ngược file .so bằng Ghidra]:::normal
+        O{Mã Máy Assembly<br>Bị Obfuscate}:::core
+    end
+
+    Hacker -->|Mức 1: Dễ dàng| D
+    D -->|Chỉ thấy| D_Res[Lệnh gọi MethodChannel]:::success
+    
+    Hacker -->|Mức 2: Khó hơn| J
+    J -->|Chỉ thấy| J_Res[Các mảng Byte bị mã hóa]:::warning
+    
+    Hacker -.->|Mức 3: Cực khó| C
+    C --> O
+    O -->|Kết quả| O_Res[Bất lực vì thuật toán ẩn sâu]:::danger
+                    </pre>
+                </div>
+            </div>
+
+            <!-- TAB 3: QUẢN LÝ KHÓA -->
+            <div id="tab-key" class="tab-panel">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="flex items-center justify-center w-8 h-8 bg-slate-800 dark:bg-slate-700 text-white rounded-md">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-white">Cấp phát Khóa Động & Xử lý In-Memory</h3>
+                </div>
+
+                <div class="diagram-section relative w-full h-[500px] md:h-[700px] bg-grid-pattern border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-inner group" data-index="2">
+                    <div class="absolute top-4 right-4 z-10 flex flex-col gap-1 bg-white/90 dark:bg-slate-800/90 p-1.5 rounded-lg backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <button class="btn-zoom-in p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Phóng to"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></button>
+                        <button class="btn-zoom-out p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Thu nhỏ"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg></button>
+                        <button class="btn-zoom-reset p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Căn giữa & Mặc định"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg></button>
+                    </div>
+                    <div class="mermaid-view absolute inset-0 w-full h-full flex items-center justify-center"></div>
+                    <pre class="mermaid-source hidden">
+sequenceDiagram
+    participant App as Flutter App
+    participant Nat as Native Wrapper
+    participant Cpp as C Plus Plus Core
+    participant Auth as Auth Server
+    participant Tile as Vector Tile Server
+
+    App->>Nat: Khởi tạo SDK (API Key)
+    Nat->>Cpp: Gọi C++ khởi tạo Engine
+    Cpp->>Auth: Request Session Key
+    Auth-->>Cpp: Trả về Dynamic Key (AES-256)
+    
+    App->>Nat: Yêu cầu tải Map Tile
+    Nat->>Cpp: Đẩy request xuống C++
+    Cpp->>Tile: Fetch Encrypted Tile
+    Tile-->>Cpp: Trả về Tile (AES-GCM)
+    
+    Cpp->>Cpp: Giải mã và đẩy thẳng vào GPU
+                    </pre>
+                </div>
+            </div>
+
+            <!-- TAB 4: API OPTIONS -->
+            <div id="tab-api" class="tab-panel">
+                
+                <!-- OPTION 1 -->
+                <div class="mb-14">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="flex items-center justify-center w-8 h-8 bg-slate-800 dark:bg-slate-700 text-white rounded-md font-bold text-sm">1</div>
+                        <h3 class="text-xl md:text-2xl font-bold text-slate-800 dark:text-white flex items-center flex-wrap gap-2">
+                            <span>Option 1: C++ Core tự động gọi API</span>
+                            <span class="text-slate-500 dark:text-slate-400 font-normal text-lg">(Bảo mật Cực đoan)</span>
+                        </h3>
+                    </div>
+
+                    <div class="diagram-section relative w-full h-[500px] md:h-[650px] bg-grid-pattern border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-inner group mb-6" data-index="3">
+                        <div class="absolute top-4 right-4 z-10 flex flex-col gap-1 bg-white/90 dark:bg-slate-800/90 p-1.5 rounded-lg backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <button class="btn-zoom-in p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Phóng to"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></button>
+                            <button class="btn-zoom-out p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Thu nhỏ"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg></button>
+                            <button class="btn-zoom-reset p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Căn giữa & Mặc định"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg></button>
+                        </div>
+                        <div class="mermaid-view absolute inset-0 w-full h-full flex items-center justify-center"></div>
+                        <pre class="mermaid-source hidden">
+sequenceDiagram
+    autonumber
+    participant App as Flutter (Dart UI)
+    participant Nat as Native Wrapper
+    participant Cpp as C++ Core Engine
+    participant API as Backend Server
+
+    App->>Nat: Yêu cầu lấy Cảnh báo tốc độ
+    activate Nat
+    Nat->>Cpp: Ủy quyền gọi mạng (Pass JNI/Obj-C)
+    activate Cpp
+    deactivate Nat
+    
+    Note right of Cpp: C++ tự quản lý HTTP Request (vd: libcurl)<br/>GET /api/v1/warnings?lat=...
+    Cpp->>API: 
+    activate API
+    API-->>Cpp: Trả về Encrypted Payload (Base64)
+    deactivate API
+    
+    Note right of Cpp: Giải mã Payload In-Memory bằng Session Key
+    
+    Cpp-->>Nat: Trả kết quả đã giải mã: 60 (Int)
+    deactivate Cpp
+    activate Nat
+    Nat-->>App: Trả kết quả thô cho Flutter vẽ UI
+    deactivate Nat
+                        </pre>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 border-t-4 border-t-emerald-500 shadow-sm">
+                            <h4 class="text-lg font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Ưu điểm: Giấu nhẹm Endpoint
+                            </h4>
+                            <p class="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                                Hacker đọc code Dart sẽ <strong>không hề biết địa chỉ URL API của bạn là gì</strong>, truyền tham số ra sao. Mọi thứ cấu hình mạng đều nằm sâu trong file mã máy <code>.so</code>.
+                            </p>
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 border-t-4 border-t-red-500 shadow-sm">
+                            <h4 class="text-lg font-bold text-red-700 dark:text-red-400 mb-3 flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                Nhược điểm: Tốn nguồn lực Dev
+                            </h4>
+                            <p class="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                                Xử lý HTTP Request, SSL/TLS Certificates, Retry logic, Timeout bằng C++ phức tạp và mất thời gian hơn rất nhiều so với viết bằng Dart/Java.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OPTION 2 -->
+                <div class="pt-10 border-t border-slate-200 dark:border-slate-800">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-md font-bold text-sm">2</div>
+                        <h3 class="text-xl md:text-2xl font-bold text-slate-800 dark:text-white flex items-center flex-wrap gap-2">
+                            <span>Option 2: Flutter gọi API & C++ làm "Máy giải mã"</span>
+                            <span class="text-slate-500 dark:text-slate-400 font-normal text-lg">(Thực dụng & Cân bằng)</span>
+                            <span class="ml-2 px-3 py-1 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 text-xs font-bold rounded-full tracking-wide">
+                                KHUYÊN DÙNG
+                            </span>
+                        </h3>
+                    </div>
+
+                    <div class="diagram-section relative w-full h-[500px] md:h-[700px] bg-grid-pattern border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-inner group mb-6" data-index="4">
+                        <div class="absolute top-4 right-4 z-10 flex flex-col gap-1 bg-white/90 dark:bg-slate-800/90 p-1.5 rounded-lg backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <button class="btn-zoom-in p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Phóng to"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></button>
+                            <button class="btn-zoom-out p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Thu nhỏ"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg></button>
+                            <button class="btn-zoom-reset p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300" title="Căn giữa & Mặc định"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg></button>
+                        </div>
+                        <div class="mermaid-view absolute inset-0 w-full h-full flex items-center justify-center"></div>
+                        <pre class="mermaid-source hidden">
+sequenceDiagram
+    autonumber
+    participant App as Flutter (Dart Dio)
+    participant Nat as Native Wrapper
+    participant Cpp as C++ Core Engine
+    participant API as Backend Server
+
+    Note right of App: Dart quản lý giao tiếp mạng vô cùng dễ dàng
+    App->>API: GET /api/v1/warnings?lat=...
+    activate API
+    API-->>App: Trả về Encrypted Payload (Base64)
+    deactivate API
+    
+    Note right of App: Dữ liệu bị mã hóa. Hacker dùng Proxy chặn thu cũng vô dụng.<br/>MethodChannel("decrypt", payload)
+    App->>Nat: 
+    activate Nat
+    Nat->>Cpp: Chuyển mảng byte xuống qua JNI/Obj-C
+    activate Cpp
+    
+    Note right of Cpp: C++ đóng vai trò "Máy giải mã Hộp đen" an toàn
+    
+    Cpp-->>Nat: Trả JSON / Chuỗi đã giải mã
+    deactivate Cpp
+    Nat-->>App: Trả lại kết quả cho Dart vẽ UI
+    deactivate Nat
+                        </pre>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 border-t-4 border-t-purple-500 shadow-sm">
+                            <h4 class="text-lg font-bold text-purple-700 dark:text-purple-400 mb-3 flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                Ưu điểm: Code cực nhanh & Thực dụng
+                            </h4>
+                            <p class="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                                Tận dụng được tối đa sức mạnh quản lý Network của hệ sinh thái Flutter (Gói Dio, Cache, Retry). Lõi C++ giờ đây cực kỳ mỏng nhẹ, chỉ đóng vai trò như một "Chiếc máy giải mã cầm tay" vô cùng an toàn.
+                            </p>
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 border-t-4 border-t-yellow-500 shadow-sm">
+                            <h4 class="text-lg font-bold text-yellow-700 dark:text-yellow-500 mb-3 flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                Nhược điểm: Lộ URL API
+                            </h4>
+                            <p class="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                                Hacker dịch ngược app sẽ thấy URL Backend của bạn. Tuy nhiên, nếu Backend yêu cầu Token xác thực chặt chẽ và luồng Payload vẫn bị mã hóa AES, thì rủi ro này là <strong>hoàn toàn có thể chấp nhận được</strong> ở mức thương mại.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            </div> <!-- End Tab 4 -->
+        </div> <!-- End Tab Content Wrapper -->
+    </div>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        
+        // Quản lý trạng thái
+        let currentTheme = 'light';
+        let panZoomInstances = {}; // Lưu trữ các instance của svg-pan-zoom
+
+        // Thiết lập cấu hình nền tảng cho Light/Dark mode
+        const themeConfigs = {
+            light: {
+                theme: 'base',
+                themeVariables: {
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: '15px',
+                    
+                    // Core colors (Flowchart)
+                    primaryColor: '#ffffff',
+                    primaryBorderColor: '#6366f1', 
+                    primaryTextColor: '#1e293b',
+                    
+                    // Lines and arrows
+                    lineColor: '#64748b', 
+                    textColor: '#0f172a',
+                    
+                    // Clusters/Subgraphs
+                    clusterBkg: '#f8fafc',
+                    clusterBorder: '#cbd5e1',
+
+                    // Sequence diagram specific
+                    actorBkg: '#eef2ff',
+                    actorBorder: '#6366f1',
+                    actorTextColor: '#312e81',
+                    actorLineColor: '#cbd5e1',
+                    signalColor: '#475569',
+                    signalTextColor: '#334155',
+                    
+                    // Notes
+                    noteBkgColor: '#fef9c3',
+                    noteBorderColor: '#facc15',
+                    noteTextColor: '#713f12',
+                    
+                    // Activations
+                    activationBorderColor: '#a5b4fc',
+                    activationBkgColor: '#e0e7ff',
+                }
+            },
+            dark: {
+                theme: 'dark',
+                themeVariables: {
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: '15px',
+                    
+                    // Core colors (Flowchart)
+                    primaryColor: '#1e293b',
+                    primaryBorderColor: '#818cf8',
+                    primaryTextColor: '#f8fafc',
+                    
+                    // Lines and arrows
+                    lineColor: '#94a3b8',
+                    textColor: '#f8fafc',
+                    
+                    // Clusters/Subgraphs
+                    clusterBkg: '#0f172a',
+                    clusterBorder: '#334155',
+
+                    // Sequence diagram specific
+                    actorBkg: '#312e81',
+                    actorBorder: '#818cf8',
+                    actorTextColor: '#e0e7ff',
+                    actorLineColor: '#475569',
+                    signalColor: '#cbd5e1',
+                    signalTextColor: '#e2e8f0',
+                    
+                    // Notes
+                    noteBkgColor: '#422006',
+                    noteBorderColor: '#d97706',
+                    noteTextColor: '#fef3c7',
+                    
+                    // Activations
+                    activationBorderColor: '#4f46e5',
+                    activationBkgColor: '#3730a3',
+                }
+            }
+        };
+
+        // Hàm chính: Vẽ lại toàn bộ sơ đồ dựa trên Theme hiện tại
+        async function renderAllDiagrams() {
+            // Khởi tạo lại Mermaid với config tương ứng theme
+            mermaid.initialize({
+                startOnLoad: false,
+                securityLevel: 'loose',
+                flowchart: { nodeSpacing: 60, rankSpacing: 60 },
+                sequence: {
+                    messageFontSize: '15px',
+                    messageFontWeight: '500'
+                },
+                ...themeConfigs[currentTheme]
+            });
+
+            const sections = document.querySelectorAll('.diagram-section');
+            
+            // Định nghĩa ClassDef màu sắc tùy biến dựa trên Theme cho Flowchart
+            const classDefs = currentTheme === 'dark' ? `
+    classDef core fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#fff;
+    classDef app fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#fff;
+    classDef wrapper fill:#1e40af,stroke:#60a5fa,stroke-width:2px,color:#fff;
+    classDef hacker fill:#7f1d1d,stroke:#f87171,stroke-width:2px,color:#fff;
+    classDef normal fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#e2e8f0;
+    classDef success fill:#14532d,stroke:#4ade80,stroke-width:2px,color:#fff;
+    classDef warning fill:#713f12,stroke:#facc15,stroke-width:2px,color:#fff;
+    classDef danger fill:#7f1d1d,stroke:#f87171,stroke-width:2px,color:#fff;
+            ` : `
+    classDef core fill:#1e3a8a,stroke:#2563eb,stroke-width:2px,color:#fff;
+    classDef app fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#14532d;
+    classDef wrapper fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e40af;
+    classDef hacker fill:#fef2f2,stroke:#ef4444,stroke-width:2px,color:#991b1b;
+    classDef normal fill:#ffffff,stroke:#94a3b8,stroke-width:2px,color:#1e293b;
+    classDef success fill:#dcfce7,stroke:#22c55e,stroke-width:2px,color:#14532d;
+    classDef warning fill:#fef9c3,stroke:#eab308,stroke-width:2px,color:#713f12;
+    classDef danger fill:#fee2e2,stroke:#ef4444,stroke-width:2px,color:#7f1d1d;
+            `;
+
+            for (let i = 0; i < sections.length; i++) {
+                const section = sections[i];
+                const index = section.dataset.index;
+                let sourceText = section.querySelector('.mermaid-source').textContent.trim();
+                const viewContainer = section.querySelector('.mermaid-view');
+                
+                // Thay thế Placeholder bằng ClassDef thực tế
+                sourceText = sourceText.replace('%%THEME_STYLES%%', classDefs);
+
+                // Tạo ID duy nhất cho mỗi lần render để Mermaid không cache sai
+                const svgId = `mermaid-svg-${Date.now()}-${index}`;
+                
+                try {
+                    // Yêu cầu Mermaid parse text ra mã SVG
+                    const { svg } = await mermaid.render(svgId, sourceText);
+                    viewContainer.innerHTML = svg;
+                    
+                    const svgElement = viewContainer.querySelector('svg');
+                    
+                    // Xóa class/style width tĩnh để cho phép pan-zoom làm chủ không gian
+                    svgElement.removeAttribute('width');
+                    svgElement.removeAttribute('height');
+                    svgElement.style.width = '100%';
+                    svgElement.style.height = '100%';
+                    svgElement.style.maxWidth = '100%';
+
+                    // Dọn dẹp instance cũ nếu đổi theme
+                    if (panZoomInstances[index]) {
+                        panZoomInstances[index].destroy();
+                    }
+
+                    // Khởi tạo tính năng kéo/thả/zoom
+                    panZoomInstances[index] = svgPanZoom(svgElement, {
+                        zoomEnabled: true,
+                        controlIconsEnabled: false,
+                        fit: true,
+                        center: true,
+                        minZoom: 0.5,
+                        maxZoom: 10,
+                        mouseWheelZoomEnabled: true
+                    });
+
+                    // Gắn sự kiện cho các nút Toolbar
+                    section.querySelector('.btn-zoom-in').onclick = () => panZoomInstances[index].zoomIn();
+                    section.querySelector('.btn-zoom-out').onclick = () => panZoomInstances[index].zoomOut();
+                    section.querySelector('.btn-zoom-reset').onclick = () => {
+                        panZoomInstances[index].resetZoom();
+                        panZoomInstances[index].center();
+                    };
+
+                } catch (error) {
+                    console.error("Lỗi vẽ sơ đồ Mermaid:", error);
+                }
+            }
+        }
+
+        // Xử lý chuyển đổi Tab
+        function setupTabs() {
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    // Reset tất cả tab active state
+                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                    tabBtns.forEach(b => {
+                        b.className = 'tab-btn shrink-0 px-5 py-3 rounded-lg border border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm font-medium transition-all flex items-center gap-2';
+                    });
+                    
+                    // Activate tab được click
+                    const targetId = e.currentTarget.dataset.target;
+                    document.getElementById(targetId).classList.add('active');
+                    e.currentTarget.className = 'tab-btn active shrink-0 px-5 py-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-semibold transition-all flex items-center gap-2';
+
+                    // Tính toán lại kích thước hiển thị cho svg-pan-zoom của Tab mới được mở
+                    const activeSection = document.getElementById(targetId).querySelectorAll('.diagram-section');
+                    activeSection.forEach(section => {
+                        const index = section.dataset.index;
+                        if (panZoomInstances[index]) {
+                            // Delay nhẹ để DOM hoàn tất active class
+                            setTimeout(() => {
+                                panZoomInstances[index].resize();
+                                panZoomInstances[index].fit();
+                                panZoomInstances[index].center();
+                            }, 50);
+                        }
+                    });
+                });
+            });
+        }
+
+        // Xử lý Dark/Light Mode Toggle
+        function setupThemeToggle() {
+            const btn = document.getElementById('theme-toggle');
+            const html = document.documentElement;
+            const iconSun = document.getElementById('theme-icon-sun');
+            const iconMoon = document.getElementById('theme-icon-moon');
+
+            // Kiểm tra theme hệ thống lúc đầu
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                currentTheme = 'dark';
+                html.classList.add('dark');
+                iconMoon.classList.add('hidden');
+                iconSun.classList.remove('hidden');
+            }
+
+            btn.addEventListener('click', () => {
+                html.classList.toggle('dark');
+                if (html.classList.contains('dark')) {
+                    currentTheme = 'dark';
+                    iconMoon.classList.add('hidden');
+                    iconSun.classList.remove('hidden');
+                } else {
+                    currentTheme = 'light';
+                    iconSun.classList.add('hidden');
+                    iconMoon.classList.remove('hidden');
+                }
+                
+                // Vẽ lại toàn bộ sơ đồ với màu sắc mới
+                renderAllDiagrams();
+            });
+        }
+
+        // Khởi động hệ thống khi DOM tải xong
+        document.addEventListener('DOMContentLoaded', () => {
+            setupTabs();
+            setupThemeToggle();
+            // Lần render đầu tiên
+            renderAllDiagrams();
+        });
+    </script>
+</body>
+</html>
